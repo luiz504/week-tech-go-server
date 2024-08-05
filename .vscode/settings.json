@@ -1,10 +1,12 @@
 {
   "cSpell.words": [
+    "dbname",
     "DBTX",
     "godotenv",
     "jackc",
     "joho",
     "pgconn",
+    "pgxpool",
     "sqlc",
     "terndotenv"
   ],
