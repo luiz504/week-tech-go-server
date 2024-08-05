@@ -1,5 +1,5 @@
 {
-  "cSpell.words": ["godotenv", "joho"],
+  "cSpell.words": ["DBTX", "godotenv", "jackc", "joho", "pgconn", "sqlc"],
   "[go]": {
     "editor.formatOnSave": true
   },
