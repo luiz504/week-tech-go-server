@@ -5,10 +5,12 @@
     "godotenv",
     "jackc",
     "joho",
+    "luiz",
     "pgconn",
     "pgxpool",
     "sqlc",
-    "terndotenv"
+    "terndotenv",
+    "Upgrader"
   ],
   "[go]": {
     "editor.formatOnSave": true
