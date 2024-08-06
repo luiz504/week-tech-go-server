@@ -79,6 +79,7 @@ func NewHandler(q *pg.Queries) http.Handler {
 	return a
 }
 
+// * WS Controllers
 func (h apiHandler) handleSubscribeToRoom(w http.ResponseWriter, r *http.Request) {
 	rawRoomID := chi.URLParam(r, "room_id")
 
@@ -125,9 +126,33 @@ func (h apiHandler) handleSubscribeToRoom(w http.ResponseWriter, r *http.Request
 	delete(h.subscribers[rawRoomID], c)
 
 	h.mu.Unlock()
-
 }
 
+type Message struct {
+	Kind   string `json:"kind"`
+	Value  any    `json:"value"`
+	RoomID string `json:"-"`
+}
+
+func (h apiHandler) notifyClients(msg Message) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	subscribers, ok := h.subscribers[msg.RoomID]
+	if !ok || len(subscribers) == 0 {
+		return
+	}
+
+	for conn, cancel := range subscribers {
+		if err := conn.WriteJSON(msg); err != nil {
+			slog.Error("failed to send message to client", "error", err)
+			cancel()
+			//* this call will trigger the handleSubscribeToRoom cleanup
+		}
+	}
+}
+
+// * HTTP Controllers
 func (h apiHandler) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 	type _body struct {
 		Theme string `json:"theme"`
@@ -153,6 +178,7 @@ func (h apiHandler) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(data)
 
+	// TODO: handle errors
 }
 
 func (h apiHandler) handleGetRooms(w http.ResponseWriter, r *http.Request) {}
