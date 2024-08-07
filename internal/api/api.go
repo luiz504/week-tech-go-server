@@ -11,10 +11,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
+	"github.com/luiz504/week-tech-go-server/internal/helpers"
 	"github.com/luiz504/week-tech-go-server/internal/store/pg"
+	"github.com/luiz504/week-tech-go-server/internal/utils"
 )
 
 type apiHandler struct {
@@ -81,9 +82,8 @@ func NewHandler(q *pg.Queries) http.Handler {
 
 // * WS Controllers
 func (h apiHandler) handleSubscribeToRoom(w http.ResponseWriter, r *http.Request) {
-	rawRoomID := chi.URLParam(r, "room_id")
 
-	roomId, err := uuid.Parse(rawRoomID)
+	roomId, err := utils.ParseUUIDParam(r, "room_id")
 	if err != nil {
 		http.Error(w, "invalid room id", http.StatusBadRequest)
 		return
@@ -101,8 +101,8 @@ func (h apiHandler) handleSubscribeToRoom(w http.ResponseWriter, r *http.Request
 
 	c, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		slog.Warn("failed to upgrade connection", "error", err)
-		http.Error(w, "failed to upgrade to ws connection", http.StatusBadRequest)
+		msg := "failed to upgrade connection"
+		helpers.LogErrorAndRespond(w, msg, err, msg, http.StatusBadRequest)
 		return
 	}
 
@@ -111,19 +111,19 @@ func (h apiHandler) handleSubscribeToRoom(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithCancel(r.Context())
 
 	h.mu.Lock()
-	if _, ok := h.subscribers[rawRoomID]; !ok {
-		h.subscribers[rawRoomID] = make(map[*websocket.Conn]context.CancelFunc)
+	if _, ok := h.subscribers[roomId.String()]; !ok {
+		h.subscribers[roomId.String()] = make(map[*websocket.Conn]context.CancelFunc)
 	}
-	h.subscribers[rawRoomID][c] = cancel
+	h.subscribers[roomId.String()][c] = cancel
 
 	h.mu.Unlock()
 
-	slog.Info("new subscriber connected", "room_id", rawRoomID, "client_ip", r.RemoteAddr)
+	slog.Info("new subscriber connected", "room_id", roomId.String(), "client_ip", r.RemoteAddr)
 	<-ctx.Done()
 	//? Will be called when the client closes the connection
 	h.mu.Lock()
 
-	delete(h.subscribers[rawRoomID], c)
+	delete(h.subscribers[roomId.String()], c)
 
 	h.mu.Unlock()
 }
@@ -173,8 +173,7 @@ func (h apiHandler) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 
 	roomId, err := h.q.InsertRoom(r.Context(), body.Theme)
 	if err != nil {
-		slog.Error("failed to insert room", "error", err)
-		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		helpers.LogErrorAndRespond(w, "failed to insert room", err, "something went wrong", http.StatusInternalServerError)
 		return
 	}
 
@@ -182,19 +181,24 @@ func (h apiHandler) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 
-	data, _ := json.Marshal(response{ID: roomId.String()})
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(data)
+	data, err := json.Marshal(response{ID: roomId.String()})
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to marshal response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
 
-	// TODO: handle errors
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(data)
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to write response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h apiHandler) handleGetRooms(w http.ResponseWriter, r *http.Request) {}
 
 func (h apiHandler) handleCreateRoomMessage(w http.ResponseWriter, r *http.Request) {
-	rawRoomID := chi.URLParam(r, "room_id")
-
-	roomId, err := uuid.Parse(rawRoomID)
+	roomId, err := utils.ParseUUIDParam(r, "room_id")
 	if err != nil {
 		http.Error(w, "invalid room id", http.StatusBadRequest)
 		return
@@ -221,8 +225,7 @@ func (h apiHandler) handleCreateRoomMessage(w http.ResponseWriter, r *http.Reque
 
 	messageID, err := h.q.InsertMessage(r.Context(), pg.InsertMessageParams{RoomID: roomId, Message: body.Message})
 	if err != nil {
-		slog.Error("failed to insert message", "error", err)
-		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		helpers.LogErrorAndRespond(w, "failed to insert message", err, "something went wrong", http.StatusInternalServerError)
 		return
 	}
 
@@ -230,18 +233,26 @@ func (h apiHandler) handleCreateRoomMessage(w http.ResponseWriter, r *http.Reque
 		ID string `json:"id"`
 	}
 
-	data, _ := json.Marshal(response{ID: messageID.String()})
+	data, err := json.Marshal(response{ID: messageID.String()})
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to marshal response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(data)
+	_, err = w.Write(data)
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to write response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
 
 	go h.notifyClients(Message{
 		Kind:   MessageKindMessageCreated,
-		RoomID: rawRoomID,
+		RoomID: roomId.String(),
 		Value: MessageMessageCreated{
 			ID:      messageID.String(),
 			Message: body.Message,
 		}})
-
 }
 
 func (h apiHandler) handleGetRoomMessages(w http.ResponseWriter, r *http.Request)           {}
