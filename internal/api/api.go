@@ -438,4 +438,42 @@ func (h apiHandler) handleRemoveReactionFromMessage(w http.ResponseWriter, r *ht
 
 	w.WriteHeader(http.StatusNoContent)
 }
-func (h apiHandler) handleMarkMessageAsAnswered(w http.ResponseWriter, r *http.Request) {}
+
+func (h apiHandler) handleMarkMessageAsAnswered(w http.ResponseWriter, r *http.Request) {
+	roomID, err := utils.ParseUUIDParam(r, "room_id")
+	if err != nil {
+		http.Error(w, "invalid room id", http.StatusBadRequest)
+		return
+	}
+	messageId, err := utils.ParseUUIDParam(r, "message_id")
+	if err != nil {
+		http.Error(w, "invalid message id", http.StatusBadRequest)
+		return
+	}
+	message, err := h.q.GetMessage(r.Context(), messageId)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "message not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	if message.RoomID.String() != roomID.String() {
+		http.Error(w, "message not found", http.StatusNotFound)
+		return
+	}
+	if message.Answered {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	err = h.q.MarkMessageAsAnswered(r.Context(), messageId)
+	if err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
