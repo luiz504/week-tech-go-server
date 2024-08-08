@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
 	"github.com/luiz504/week-tech-go-server/internal/helpers"
+	"github.com/luiz504/week-tech-go-server/internal/mappers"
 	"github.com/luiz504/week-tech-go-server/internal/store/pg"
 	"github.com/luiz504/week-tech-go-server/internal/utils"
 )
@@ -303,11 +304,11 @@ func (h apiHandler) handleGetRoomMessages(w http.ResponseWriter, r *http.Request
 	}
 
 	type response struct {
-		RoomID   string       `json:"room_id"`
-		Messages []pg.Message `json:"messages"`
+		RoomID   string                `json:"room_id"`
+		Messages []mappers.RoomMessage `json:"messages"`
 	}
 
-	data, err := json.Marshal(response{RoomID: roomId.String(), Messages: messages})
+	data, err := json.Marshal(response{RoomID: roomId.String(), Messages: mappers.MapMessageToRoomMessage(messages)})
 	if err != nil {
 		helpers.LogErrorAndRespond(w, "failed to marshal response", err, "something went wrong", http.StatusInternalServerError)
 		return
