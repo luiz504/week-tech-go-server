@@ -130,12 +130,17 @@ func (h apiHandler) handleSubscribeToRoom(w http.ResponseWriter, r *http.Request
 }
 
 const (
-	MessageKindMessageCreated = "message_created"
+	MessageKindMessageCreated  = "message_created"
+	MessageKindMessageAnswered = "message_answered"
 )
 
 type MessageMessageCreated struct {
 	ID      string `json:"id"`
 	Message string `json:"message"`
+}
+type MessageMessageAnswered struct {
+	ID     string `json:"id"`
+	RoomID string `json:"room_id"`
 }
 type Message struct {
 	Kind   string `json:"kind"`
@@ -510,4 +515,15 @@ func (h apiHandler) handleMarkMessageAsAnswered(w http.ResponseWriter, r *http.R
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+
+	go h.notifyClients(
+		Message{
+			RoomID: roomID.String(),
+			Kind:   MessageKindMessageAnswered,
+			Value: MessageMessageAnswered{
+				ID:     message.ID.String(),
+				RoomID: message.RoomID.String(),
+			},
+		},
+	)
 }

@@ -13,8 +13,15 @@
     "Upgrader"
   ],
   "[go]": {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "golang.go",
+    "editor.rulers": [
+      80,
+      120
+    ],
   },
-  "go.formatTool": "goimports",
-  "gopls": { "ui.semanticTokens": true }
+  "gopls": {
+    "ui.semanticTokens": true
+  },
+  "go.formatTool": "goimports"
 }
