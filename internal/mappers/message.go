@@ -11,6 +11,9 @@ type RoomMessage struct {
 }
 
 func MapMessageToRoomMessage(messages []pg.Message) []RoomMessage {
+	if messages == nil {
+		return []RoomMessage{}
+	}
 	var roomMessages []RoomMessage
 	for _, message := range messages {
 		roomMessages = append(roomMessages, RoomMessage{
