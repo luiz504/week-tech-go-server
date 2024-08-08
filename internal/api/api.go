@@ -130,8 +130,10 @@ func (h apiHandler) handleSubscribeToRoom(w http.ResponseWriter, r *http.Request
 }
 
 const (
-	MessageKindMessageCreated  = "message_created"
-	MessageKindMessageAnswered = "message_answered"
+	MessageKindMessageCreated           = "message_created"
+	MessageKindMessageAnswered          = "message_answered"
+	MessageKindMessageReactionIncreased = "message_reaction_increased"
+	MessageKindMessageReactionDecreased = "message_reaction_decreased"
 )
 
 type MessageMessageCreated struct {
@@ -141,6 +143,12 @@ type MessageMessageCreated struct {
 type MessageMessageAnswered struct {
 	ID     string `json:"id"`
 	RoomID string `json:"room_id"`
+}
+
+type MessageMessageReactionUpdated struct {
+	ID     string `json:"id"`
+	RoomID string `json:"room_id"`
+	Count  int64  `json:"count"`
 }
 type Message struct {
 	Kind   string `json:"kind"`
@@ -421,6 +429,17 @@ func (h apiHandler) handleReactToMessage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	go h.notifyClients(
+		Message{
+			RoomID: roomID.String(),
+			Kind:   MessageKindMessageReactionIncreased,
+			Value: MessageMessageReactionUpdated{
+				ID:     message.ID.String(),
+				RoomID: message.RoomID.String(),
+				Count:  count,
+			},
+		},
+	)
 }
 func (h apiHandler) handleRemoveReactionFromMessage(w http.ResponseWriter, r *http.Request) {
 	roomID, err := utils.ParseUUIDParam(r, "room_id")
@@ -476,6 +495,18 @@ func (h apiHandler) handleRemoveReactionFromMessage(w http.ResponseWriter, r *ht
 		helpers.LogErrorAndRespond(w, "failed to write response", err, "something went wrong", http.StatusInternalServerError)
 		return
 	}
+
+	go h.notifyClients(
+		Message{
+			RoomID: roomID.String(),
+			Kind:   MessageKindMessageReactionDecreased,
+			Value: MessageMessageReactionUpdated{
+				ID:     message.ID.String(),
+				RoomID: message.RoomID.String(),
+				Count:  count,
+			},
+		},
+	)
 }
 
 func (h apiHandler) handleMarkMessageAsAnswered(w http.ResponseWriter, r *http.Request) {
