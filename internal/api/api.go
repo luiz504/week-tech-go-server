@@ -392,13 +392,30 @@ func (h apiHandler) handleReactToMessage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_, err = h.q.ReactToMessage(r.Context(), messageId)
+	count, err := h.q.ReactToMessage(r.Context(), messageId)
 	if err != nil {
 		http.Error(w, "something went wrong", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	type response struct {
+		Count int64 `json:"count"`
+	}
+
+	data, err := json.Marshal(response{Count: count})
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to marshal response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(data)
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to write response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
 }
 func (h apiHandler) handleRemoveReactionFromMessage(w http.ResponseWriter, r *http.Request) {
 	roomID, err := utils.ParseUUIDParam(r, "room_id")
@@ -431,13 +448,29 @@ func (h apiHandler) handleRemoveReactionFromMessage(w http.ResponseWriter, r *ht
 		return
 	}
 
-	_, err = h.q.RemoveReactionFromMessage(r.Context(), messageId)
+	count, err := h.q.RemoveReactionFromMessage(r.Context(), messageId)
 	if err != nil {
 		http.Error(w, "something went wrong", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	type response struct {
+		Count int64 `json:"count"`
+	}
+
+	data, err := json.Marshal(response{Count: count})
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to marshal response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(data)
+	if err != nil {
+		helpers.LogErrorAndRespond(w, "failed to write response", err, "something went wrong", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h apiHandler) handleMarkMessageAsAnswered(w http.ResponseWriter, r *http.Request) {
